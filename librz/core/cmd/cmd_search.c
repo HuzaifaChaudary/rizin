@@ -1642,13 +1642,17 @@ static int pass_to_legacy_api(RzCore *core, int argc, const char **argv, RzOutpu
 		core->in_search = false; \
 	} while (0)
 
+typedef struct {
+	RzInterrupt *intr; ///< Interrupt that cancels the search
+	bool show_progress; ///< Print the number of hits found so far
+} SearchCancelCtx;
+
 static bool cmd_search_progress_cancel(void *user, size_t n_hits, RzSearchCancelReason invoke_reason) {
-	RzCmdStateOutput *state = (RzCmdStateOutput *)user;
-	if (state) {
-		// we have RzCmdStateOutput state
+	SearchCancelCtx *ctx = user;
+	if (ctx->show_progress) {
 		eprintf("Searching... hits: %" PFMTSZu "\r", n_hits);
 	}
-	return rz_interrupt_is_breaked(user);
+	return rz_interrupt_is_breaked(ctx->intr);
 }
 
 static void cmd_search_output_to_state(RzCmdStateOutput *state, RzSearchHit *hit, const char *flag_name, const char *detail, RzCons *cons) {
@@ -1796,8 +1800,11 @@ static RzCmdStatus byte_pattern_search(RzCore *core, RZ_OWN RzSearchBytesPattern
 
 	CMD_SEARCH_BEGIN();
 
-	bool progress = rz_search_opt_get_show_progress(search_opts) != RZ_SEARCH_PROGRESS_DISABLED;
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? (void *)state : (void *)core->intr)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = rz_search_opt_get_show_progress(search_opts) != RZ_SEARCH_PROGRESS_DISABLED,
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("code: Failed to setup default search options.\n");
 		rz_search_bytes_pattern_free(pattern);
 		goto error;
@@ -1829,8 +1836,11 @@ static RzCmdStatus value_range_search(RzCore *core, RZ_OWN RzVector /*<RzSearchV
 
 	CMD_SEARCH_BEGIN();
 
-	bool progress = !rz_str_is_false(rz_config_get(core->config, "search.show_progress"));
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? state : NULL)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = !rz_str_is_false(rz_config_get(core->config, "search.show_progress")),
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("code: Failed to setup default search options.\n");
 		rz_vector_free(ranges);
 		goto error;
@@ -1988,8 +1998,11 @@ RZ_IPI RzCmdStatus rz_cmd_search_cryptographic_material_handler(RzCore *core, in
 
 	CMD_SEARCH_BEGIN();
 
-	bool progress = rz_config_get_b(core->config, "search.show_progress");
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? state : NULL)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = rz_config_get_b(core->config, "search.show_progress"),
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("code: Failed to setup default search options.\n");
 		goto error;
 	}
@@ -2028,8 +2041,11 @@ RZ_IPI RzCmdStatus rz_cmd_search_hash_block_handler(RzCore *core, int argc, cons
 
 	CMD_SEARCH_BEGIN();
 
-	bool progress = rz_config_get_b(core->config, "search.show_progress");
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? state : NULL)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = rz_config_get_b(core->config, "search.show_progress"),
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("search: Failed to setup default search options.\n");
 		goto error;
 	}
@@ -2067,8 +2083,11 @@ static RzCmdStatus cmd_search_hash_entropy_handler(RzCore *core, int argc, const
 
 	CMD_SEARCH_BEGIN();
 
-	bool progress = rz_config_get_b(core->config, "search.show_progress");
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? state : NULL)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = rz_config_get_b(core->config, "search.show_progress"),
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("search: Failed to setup default search options.\n");
 		goto error;
 	}
@@ -2459,8 +2478,11 @@ RZ_IPI RzCmdStatus rz_cmd_search_hex_regex_handler(RzCore *core, int argc, const
 		goto error;
 	}
 
-	bool progress = rz_search_opt_get_show_progress(search_opts) != RZ_SEARCH_PROGRESS_DISABLED;
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? state : NULL)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = rz_search_opt_get_show_progress(search_opts) != RZ_SEARCH_PROGRESS_DISABLED,
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("code: Failed to setup default search options.\n");
 		goto error;
 	}
@@ -2530,8 +2552,11 @@ static RzCmdStatus cmd_string_search_generic(RzCore *core, const char *string, c
 		// Else we are fine, since the encoding in the settings is set to 'guess'.
 	}
 
-	bool progress = rz_search_opt_get_show_progress(search_opts) != RZ_SEARCH_PROGRESS_DISABLED;
-	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, progress ? state : NULL)) {
+	SearchCancelCtx cancel_ctx = {
+		.intr = core->intr,
+		.show_progress = rz_search_opt_get_show_progress(search_opts) != RZ_SEARCH_PROGRESS_DISABLED,
+	};
+	if (!rz_search_opt_set_cancel_cb(search_opts, cmd_search_progress_cancel, &cancel_ctx)) {
 		RZ_LOG_ERROR("code: Failed to setup default search options.\n");
 		free(search_str);
 		rz_search_opt_free(search_opts);
