@@ -516,15 +516,24 @@ typedef struct search_ctx {
 	RzThreadQueue /*<RzSearchInterval *>*/ *finished_intervals; ///< Interval queue
 } search_ctx_t;
 
-static void print_intervals(RZ_NONNULL RzThreadQueue /*<RzSearchInterval *>*/ *intervals) {
+/**
+ * \brief Prints the finished search intervals.
+ *
+ * \param intervals The queue of finished intervals.
+ * \param wait When true, waits for new intervals until the queue is closed,
+ * otherwise only prints the intervals already finished.
+ */
+static void print_intervals(RZ_NONNULL RzThreadQueue /*<RzSearchInterval *>*/ *intervals, bool wait) {
 	rz_return_if_fail(intervals);
 
 	void *data = NULL;
-	while (rz_th_queue_pop(intervals, false, &data) && data) {
+	// popping an empty queue waits until it is closed, after the search
+	while ((wait || !rz_th_queue_is_empty(intervals)) && rz_th_queue_pop(intervals, false, &data) && data) {
 		RzSearchInterval *search_interval = (RzSearchInterval *)data;
 		RzInterval *itv = &search_interval->interval;
 		eprintf("[0x%" PFMT64x ", 0x%" PFMT64x "): %" PFMTSZu "\n", itv->addr, itv->addr + itv->size,
 			search_interval->n_hits);
+		rz_search_interval_free(search_interval);
 		data = NULL;
 	}
 }
@@ -538,14 +547,14 @@ static void *search_cancel_th(void *user) {
 		if (!rz_atomic_bool_get(ctx->loop)) {
 			break;
 		}
-		print_intervals(ctx->finished_intervals);
+		print_intervals(ctx->finished_intervals, false);
 		size_t n_hits = rz_th_queue_size(ctx->hits);
 		if (opt->cancel_cb(opt->cancel_usr, n_hits, RZ_SEARCH_CANCEL_REGULAR_CHECK)) {
 			rz_atomic_bool_set(ctx->loop, false);
 			break;
 		}
 	}
-	print_intervals(ctx->finished_intervals);
+	print_intervals(ctx->finished_intervals, true);
 
 	return NULL;
 }
@@ -745,13 +754,13 @@ RZ_API RZ_OWN RzList /*<RzSearchHit *>*/ *rz_search_on_io(
 		rz_th_queue_close_when_empty(intervals);
 		rz_th_wait(cancel_th);
 		rz_th_free(cancel_th);
-		rz_atomic_bool_free(ctx.loop);
 	}
 
 	rz_th_lock_free(ctx.io_lock);
 	rz_list_free(windows);
 	rz_th_queue_free(hits);
 	rz_th_queue_free(intervals);
+	rz_atomic_bool_free(ctx.loop);
 
 	rz_list_sort(results, (RzListComparator)rz_search_hit_cmp, NULL);
 	rz_list_sorted_uniq(results, (RzListComparator)rz_search_hit_cmp, NULL);
@@ -860,6 +869,7 @@ RZ_API RZ_OWN RzList /*<RzSearchHit *>*/ *rz_search_on_buffer(
 	if (cancel_th) {
 		// stop & free cancel thread.
 		rz_atomic_bool_set(ctx.loop, false);
+		rz_th_queue_close_when_empty(intervals);
 		rz_th_wait(cancel_th);
 		rz_th_free(cancel_th);
 	}
