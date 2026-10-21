@@ -4088,6 +4088,27 @@ static inline bool is_filtered_flag(RzDisasmState *ds, const char *name) {
 	return false;
 }
 
+/**
+ * \brief Tells whether the analysis found code at \p addr.
+ */
+static bool is_analyzed_code(RzCore *core, ut64 addr) {
+	if (rz_analysis_get_fcn_in(core->analysis, addr, 0)) {
+		return true;
+	}
+	bool code = false;
+	RzListIter *iter;
+	RzAnalysisXRef *xref;
+	RzList *list = rz_analysis_xrefs_get_to(core->analysis, addr);
+	rz_list_foreach (list, iter, xref) {
+		if (xref->type == RZ_ANALYSIS_XREF_TYPE_CODE || xref->type == RZ_ANALYSIS_XREF_TYPE_CALL) {
+			code = true;
+			break;
+		}
+	}
+	rz_list_free(list);
+	return code;
+}
+
 /* convert numeric value in opcode to ascii char or number */
 static void ds_print_ptr(RzDisasmState *ds, int len, int idx) {
 	RzCore *core = ds->core;
@@ -4147,6 +4168,10 @@ static void ds_print_ptr(RzDisasmState *ds, int len, int idx) {
 	RzList *list = rz_analysis_xrefs_get_from(core->analysis, ds->at);
 	rz_list_foreach (list, iter, xref) {
 		if (xref->type == RZ_ANALYSIS_XREF_TYPE_STRING || xref->type == RZ_ANALYSIS_XREF_TYPE_DATA) {
+			// the code a loaded pointer refers to says less than the pointer itself
+			if (xref->to != p && is_analyzed_code(core, xref->to)) {
+				continue;
+			}
 			if ((f = rz_flag_get_i(core->flags, xref->to))) {
 				refaddr = xref->to;
 				break;

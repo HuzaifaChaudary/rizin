@@ -943,6 +943,7 @@ aa
 pdf @ main
 EOF
 EXPECT=<<EOF
+            ; DATA XREF from entry0 @ 0x402088
 / int main(int argc, char **argv, char **envp);
 |           ; arg int argc @ a0
 |           ; arg char **argv @ a1
@@ -1761,7 +1762,7 @@ nth vaddr bind type lib name
 |       :   0x00002a1c      lui   gp, 2
 |       :   0x00002a20      addiu gp, gp, -sym._dl_parse_relocation_information
 |       :   0x00002a24      addu  gp, gp, t9
-|       :   0x00002a28      lw    v0, -obj._dl_malloc_function(gp)     ; [0x17074:4]=0x17184 obj._dl_malloc_function
+|       :   0x00002a28      lw    v0, -obj._dl_malloc_function(gp)     ; [0x17184:4]=0
 |       :   0x00002a2c      addiu sp, sp, -8
 |       :   0x00002a30      lw    t9, 0(v0)
 |       :   0x00002a34      sw    fp, (var_4h)
@@ -1793,7 +1794,7 @@ nth vaddr bind type lib name
 |           0x000028e0      addiu gp, gp, -0x38dc
 |           0x000028e4      addu  gp, gp, t9
 |           0x000028e8      addiu sp, sp, -0x30
-|           0x000028ec      lw    v0, -obj._dl_pagesize(gp)            ; [0x1702c:4]=0x1718c obj._dl_pagesize
+|           0x000028ec      lw    v0, -obj._dl_pagesize(gp)            ; [0x1718c:4]=0
 |           0x000028f0      sw    s3, (var_ch)
 |           0x000028f4      sw    s2, (var_10h)
 |           0x000028f8      lw    s3, -0x7fd8(gp)                      ; [0x17028:4]=0x10000
@@ -1833,14 +1834,14 @@ nth vaddr bind type lib name
 |       |   0x00002980      addiu sp, sp, 0x20
 |      ,==< 0x00002984      beqz  a3, 0x299c
 |      ||   0x00002988      addiu v1, zero, -1
-|      ||   0x0000298c      lw    v1, -obj._dl_errno(gp)               ; [0x17024:4]=0x17190 obj._dl_errno
+|      ||   0x0000298c      lw    v1, -obj._dl_errno(gp)               ; [0x17190:4]=0
 |      ||   0x00002990      sw    v0, 0(v1)
 |      ||   0x00002994      addiu v0, zero, -1
 |      ||   0x00002998      addiu v1, zero, -1
 |      `--> 0x0000299c      sw    v0, 0x71b4(s2)
 |      ,==< 0x000029a0      bne   v0, v1, 0x29e0
 |      ||   0x000029a4      sw    v0, 0x71b8(s3)
-|      ||   0x000029a8      lw    v0, -loc._fdata(gp)                  ; [0x17070:4]=0x17000 obj._dl_progname
+|      ||   0x000029a8      lw    v0, -loc._fdata(gp)                  ; [0x17000:4]=0xfffefb48 ; u"\U0000feff䣻"
 |      ||   0x000029ac      lw    a1, -0x7fe4(gp)                      ; [0x1701c:4]=0
 |      ||   0x000029b0      lw    t9, -sym._dl_dprintf(gp)             ; [0x1706c:4]=0x216c sym._dl_dprintf
 |      ||   0x000029b4      lw    a2, 0(v0)
@@ -1852,7 +1853,7 @@ nth vaddr bind type lib name
 |      ||   0x000029cc      addiu v0, zero, 0xfa1
 |      ||   0x000029d0      syscall
 |     ,===< 0x000029d4      beqz  a3, 0x29e0
-|     |||   0x000029d8      lw    v1, -obj._dl_errno(gp)               ; [0x17024:4]=0x17190 obj._dl_errno
+|     |||   0x000029d8      lw    v1, -obj._dl_errno(gp)               ; [0x17190:4]=0
 |     |||   0x000029dc      sw    v0, 0(v1)
 |     ```-> 0x000029e0      lw    v0, 0x71b4(s2)
 |           0x000029e4      move  sp, fp
